@@ -290,18 +290,20 @@ def evaluate(
     mus_list = []
     batch = None  # for pylint
 
+    print("Evaluation")
     start_time = time.time()
     for batch in data_loader:
         batch = batch.to(device)
         batch_dict = batch.to_dict()
-        output = model(
-            batch_dict,
-            training=False,
-            compute_force=output_args["forces"],
-            compute_virials=output_args["virials"],
-            compute_stress=output_args["stress"],
-        )
-        batch = batch.cpu()
+        with torch.no_grad():
+            output = model(
+                batch_dict,
+                training=False,
+                compute_force=output_args["forces"],
+                compute_virials=output_args["virials"],
+                compute_stress=output_args["stress"],
+            )
+            batch = batch.cpu()
         output = tensor_dict_to_device(output, device=torch.device("cpu"))
 
         loss = loss_fn(pred=output, ref=batch)
