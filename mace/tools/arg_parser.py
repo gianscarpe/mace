@@ -206,7 +206,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         "--compute_forces",
         help="Select True to compute forces",
         type=bool,
-        default=True,
+        default=False,
     )
 
     # Dataset
@@ -282,6 +282,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         help="type of loss",
         default="weighted",
         choices=[
+            'energy_only',
             "ef",
             "weighted",
             "forces_only",

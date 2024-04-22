@@ -114,7 +114,8 @@ def config_from_atoms(
     if config_type_weights is None:
         config_type_weights = DEFAULT_CONFIG_TYPE_WEIGHTS
 
-    energy = atoms.info.get(energy_key, None)  # eV
+    
+    energy = atoms.info.get(energy_key, None) * 27.2114  # Hartree to eV
     forces = atoms.arrays.get(forces_key, None)  # eV / Ang
     stress = atoms.info.get(stress_key, None)  # eV / Ang
     virials = atoms.info.get(virials_key, None)
@@ -184,6 +185,10 @@ def test_config_types(
             test_by_ct[ind][1].append(conf)
     return test_by_ct
 
+import torch.multiprocessing as mp
+import pickle
+import functools
+import os
 
 def load_from_xyz(
     file_path: str,
@@ -195,8 +200,61 @@ def load_from_xyz(
     dipole_key: str = "dipole",
     charges_key: str = "charges",
     extract_atomic_energies: bool = False,
+    n_proc=len(os.sched_getaffinity(0)),
+    tmpdir=".tmp"):
+
+    
+    os.makedirs(tmpdir, exist_ok=True)
+    file_name = os.path.basename(file_path)
+    tmpdir =  os.path.join(tmpdir, file_name)
+    if os.path.exists(tmpdir) and len(os.listdir(tmpdir)) > 0:
+        paths = [os.path.join(tmpdir, p) for p in os.listdir(tmpdir)]
+    elif n_proc > 1:
+        os.makedirs(tmpdir, exist_ok=True)
+        reader = functools.partial(_load_from_xyz,
+                                       file_path=file_path,
+                                       config_type_weights=config_type_weights,
+                                       world_size=n_proc,
+                                       energy_key=energy_key,
+                                       forces_key=forces_key,
+                                       stress_key=stress_key,
+                                       virials_key=virials_key,
+                                       dipole_key=dipole_key,
+                                       charges_key=charges_key,
+                                       extract_atomic_energies=extract_atomic_energies,
+                                       tmpdir=tmpdir)
+
+        ctx = mp.get_context("forkserver")
+        with ctx.Pool(processes=n_proc) as p:
+            paths = p.map(reader, list(range(n_proc)))
+    else:
+        raise Exception("no multiprocessing found!")
+    data = []
+
+    for p in paths:
+        with open(p, "rb") as f:
+            dp = pickle.load(f)
+            data += dp[1]
+    return {}, data
+
+    
+def _load_from_xyz(
+    rank: int,
+    world_size: int,
+    tmpdir: str    ,
+    file_path: str,
+    config_type_weights: Dict,
+    energy_key: str = "energy",
+    forces_key: str = "forces",
+    stress_key: str = "stress",
+    virials_key: str = "virials",
+    dipole_key: str = "dipole",
+    charges_key: str = "charges",
+    extract_atomic_energies: bool = False,
+
 ) -> Tuple[Dict[int, float], Configurations]:
-    atoms_list = ase.io.read(file_path, index=":")
+    index = slice(rank, None, world_size)
+    atoms_list = ase.io.read(file_path, index=index, parallel=False)
 
     if not isinstance(atoms_list, list):
         atoms_list = [atoms_list]
@@ -236,7 +294,10 @@ def load_from_xyz(
         dipole_key=dipole_key,
         charges_key=charges_key,
     )
-    return atomic_energies_dict, configs
+    path = os.path.join(tmpdir, f"{rank:10d}.pkl")
+    with open(path, 'wb') as f:
+        pickle.dump((atomic_energies_dict, configs), f)
+    return path
 
 
 def compute_average_E0s(

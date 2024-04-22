@@ -38,6 +38,7 @@ def get_dataset_from_xyz(
     charges_key: str = "charges",
 ) -> Tuple[SubsetCollection, Optional[Dict[int, float]]]:
     """Load training and test dataset from xyz file"""
+
     atomic_energies_dict, all_train_configs = data.load_from_xyz(
         file_path=train_path,
         config_type_weights=config_type_weights,

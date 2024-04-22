@@ -129,20 +129,22 @@ def main() -> None:
         )
         logging.info(f"Atomic energies: {atomic_energies.tolist()}")
 
+    class Dataset:
+        def __init__(self, configs):
+            self.configs = configs
+        def __len__(self):
+            return len(self.configs)
+        def __getitem__(self, idx):
+            return data.AtomicData.from_config(self.configs[idx], z_table=z_table, cutoff=args.r_max)
+        
     train_loader = torch_geometric.dataloader.DataLoader(
-        dataset=[
-            data.AtomicData.from_config(config, z_table=z_table, cutoff=args.r_max)
-            for config in collections.train
-        ],
+        dataset=Dataset(collections.train),
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=True,
     )
     valid_loader = torch_geometric.dataloader.DataLoader(
-        dataset=[
-            data.AtomicData.from_config(config, z_table=z_table, cutoff=args.r_max)
-            for config in collections.valid
-        ],
+        dataset=Dataset(collections.valid),
         batch_size=args.valid_batch_size,
         shuffle=False,
         drop_last=False,
@@ -153,6 +155,8 @@ def main() -> None:
         loss_fn = modules.WeightedEnergyForcesLoss(
             energy_weight=args.energy_weight, forces_weight=args.forces_weight
         )
+    elif args.loss == 'energy_only':
+        loss_fn = modules.WeightedEnergyLoss(energy_weight=args.energy_weight)
     elif args.loss == "forces_only":
         loss_fn = modules.WeightedForcesLoss(forces_weight=args.forces_weight)
     elif args.loss == "virials":

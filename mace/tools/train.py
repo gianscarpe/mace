@@ -8,7 +8,7 @@ import dataclasses
 import logging
 import time
 from typing import Any, Dict, Optional, Tuple
-
+import tqdm
 import numpy as np
 import torch
 from torch.optim.swa_utils import SWALR, AveragedModel
@@ -88,7 +88,7 @@ def train(
                 swa.scheduler.step()
 
         # Train
-        for batch in train_loader:
+        for batch in tqdm.tqdm(train_loader):
             _, opt_metrics = take_step(
                 model=model,
                 loss_fn=loss_fn,
@@ -127,7 +127,7 @@ def train(
             logger.log(eval_metrics)
             if log_errors == "PerAtomRMSE":
                 error_e = eval_metrics["rmse_e_per_atom"] * 1e3
-                error_f = eval_metrics["rmse_f"] * 1e3
+                error_f = 0
                 logging.info(
                     f"Epoch {epoch}: loss={valid_loss:.4f}, RMSE_E_per_atom={error_e:.1f} meV, RMSE_F={error_f:.1f} meV / A"
                 )
@@ -186,7 +186,8 @@ def train(
                     "epoch": epoch,
                     "valid_loss": valid_loss,
                     "valid_rmse_e_per_atom": eval_metrics["rmse_e_per_atom"],
-                    "valid_rmse_f": eval_metrics["rmse_f"],
+                    "valid_rmse_e_tot": eval_metrics["rmse_e"],
+                    #"valid_rmse_f": eval_metrics["rmse_f"] 
                 }
                 wandb.log(wandb_log_dict)
             if valid_loss >= lowest_loss:

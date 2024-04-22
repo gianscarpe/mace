@@ -27,6 +27,7 @@ from .loss import (
     WeightedEnergyForcesStressLoss,
     WeightedEnergyForcesVirialsLoss,
     WeightedForcesLoss,
+    WeightedEnergyLoss,
     WeightedHuberEnergyForcesStressLoss,
 )
 from .models import (
